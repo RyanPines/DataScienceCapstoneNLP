@@ -1,0 +1,311 @@
+---
+title: "Mile Stone Report"
+author: "Ryan Pines"
+date: "April 18, 2017"
+output: html_document
+---
+
+## Introduction and Purpose
+
+The purpose of this MileStone Report is to gather, summarize, and clean data, as well as build and explore N-gram models, from the Swift Key Data Set, which can be found at the following link: https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip.
+
+The data set is comprosised of three different text files: One from the news, one from blogs, and one from twitter. The data comes in 4 different languages: German, Finnish, Russian, and English. For this report, we will work with the data in the English language.
+
+Our first step will be to read in the data, and provide a basic summary of each of the files. Specifically, we will observe the number of lines and number of words in each of the files.
+
+Afterwards, given the size of the data, we will take a small sample from all 3 of the files, and combine the files into one text file. Afterwards, we will convert the text file into a corpus and clean the corpus by removing numbers and punctuation, by stripping whitespace, by converting uppercase characters to lowercase, and by removing profanity words.
+
+Finally, we will build and explore graphically three N-gram models. The first a Unigram model, which contains single words. The second a Bigram model, which contains word pairs. The third a Trigram model, which contains word triplets.
+
+
+## Loading the Libraries
+```{r, warning = FALSE, message = FALSE}
+library(tm)
+library(RWeka)
+library(stringi)
+library(data.table)
+```
+
+## Gathering the Data
+Create a new directory if necessary
+```{r, eval = FALSE}
+if(!file.exists("NLP_data")){
+	dir.create("NLP_data")
+}
+```
+
+Download the Capstone Dataset
+```{r, eval = FALSE}
+fileURL <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+download.file(fileURL, destfile = "./NLP_data/NLP_Dataset.zip", mode = "wb")
+```
+
+Unzip the File
+```{r, eval = FALSE}
+unzip(zipfile = "./NLP_data/NLP_Dataset.zip", exdir = "./NLP_data")
+```
+
+Navigate through the Capstone dataset. Notice there are 4 folders for 4 different languages: German, English, Finnish, Russian. Navigate to the folder that contains the data in the English language.
+```{r}
+setwd("C:\\Users\\574996\\Desktop\\R_Assignments\\NLP_data\\final\\en_US")
+```
+
+Open a connection in binary mode (I am using a Windows computer) and read in the "Blogs" file. Afterwards, close the connection.
+```{r}
+conBlog <- file("en_US.blogs.txt", "rb")
+Blogs <- readLines(conBlog)
+close(conBlog)
+```
+
+Open a connection in binary mode (I am using a Windows computer) and read in the "News" file. Afterwards, close the connection.
+```{r}
+conNew <- file("en_US.news.txt", "rb")
+News <- readLines(conNew)
+close(conNew)
+```
+
+Open a connection in binary mode (I am using a Windows computer) and read in the "Twitter" file. Afterwards, close the connection.
+```{r, warning = FALSE, message = FALSE}
+conTwitter <- file("en_US.twitter.txt", "rb")
+Twitter <- readLines(conTwitter)
+close(conTwitter)
+```
+
+
+## Basic Summary of the Three Data Files
+
+Create a vector "fileNames" that stores the file names
+```{r, warning = FALSE, message = FALSE}
+fileNames <- c("en_US.blogs.txt","en_US.news.txt","en_US.twitter.txt")
+```
+
+Determine the number of lines for each of the files and combine the results into one vector called "numLines"
+```{r, warning = FALSE, message = FALSE}
+numLinesBlogs <- length(Blogs)
+numLinesNews <- length(News)
+numLinesTwitter <- length(Twitter)
+numLines <- c(numLinesBlogs, numLinesNews, numLinesTwitter)
+```
+
+Determine the number of words for each of the files and combine the results into one vector called "numWords"
+```{r, warning = FALSE, message = FALSE}
+numWordsBlogs <- sum(stri_count(Blogs,regex="\\S+"))
+numWordsNews <- sum(stri_count(News,regex="\\S+"))
+numWordsTwitter <- sum(stri_count(Twitter,regex="\\S+"))
+numWords <- c(numWordsBlogs, numWordsNews, numWordsTwitter)
+```
+
+Create and display a data table that shows the file names, as well as the
+number of lines and words for each of the files
+```{r, warning = FALSE, message = FALSE}
+data.table(fileNames,numLines,numWords)
+```
+
+## Sampling the Data
+
+**Given the size of all of the files, we will take a 1% sample from each file**
+
+First, set the seed for reproducibility
+```{r}
+set.seed(223334444)
+```
+
+Sample the files
+```{r}
+blogsSample <- sample(Blogs, round(length(Blogs)*0.01,digits = 0))
+newsSample <- sample(News, round(length(News)*0.01,digits = 0))
+twitterSample <- sample(Twitter, round(length(Twitter)*0.01,digits = 0))
+```
+
+Combine the files together into one single text file
+```{r}
+textFileSample <- paste(blogsSample,newsSample,twitterSample)
+```
+
+
+## Cleaning the Data
+
+From the newly created single text file, create a corpus: 
+```{r}
+textFileVectorSource <- VectorSource(textFileSample)
+corpus <- VCorpus(textFileVectorSource)
+```
+
+From the newly created corpus, convert all uppercase letters to lowercase letters, remove punctuation, remove numbers, and strip the whitespace:
+```{r}
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeNumbers)
+```
+
+Next, we will need to remove all sources of profanity from our corpus
+
+First, we will gather a list of profanity 
+A list of profanity words can be gathered from the following website: http://www.cs.cmu.edu/~biglou/resources/bad-words.txt
+```{r}
+conProfanity <- url("http://www.cs.cmu.edu/~biglou/resources/bad-words.txt", "r")
+Profanity <- readLines(conProfanity)
+close(conProfanity)
+```
+
+Now, remove all of the text that contain profanity
+```{r}
+corpus <- tm_map(corpus, removeWords, Profanity)
+```
+
+
+## Building N-Gram Models and Conducting Exploratory Analysis
+
+When conducting exploratory analysis, we will build three N-gram models. One for Single Words (a Unigram), one for Word Pairs (a Bigram), and one for Word Triplets (a Trigram). We will explore the N-gram models by analyzing and displaying the top 25 frequencies in a bar plot for each of the N-gram models.
+
+### Building a Unigram Model
+
+Tokenize a Unigram:
+```{r}
+unigram <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+```
+
+Create a Term Document Matrix:
+```{r}
+unigramMatrix <- TermDocumentMatrix(corpus, control = list(tokenize = unigram))
+```
+
+To reduce the size of the data, find all words in the Unigram Matrix with a frequency of at least 50:
+```{r}
+unigramFreqTerms <- findFreqTerms(unigramMatrix, lowfreq = 50)
+unigramMatrix <- unigramMatrix[unigramFreqTerms,]
+```
+
+Convert the unigram matrix variable to an actual matrix and determine the frequency of each of the words in the matrix by adding the rows of the matrix (each row represents a word):
+```{r}
+unigramMatrix <- as.matrix(unigramMatrix)
+unigramTermFreq <- rowSums(unigramMatrix)
+```
+
+Create a data frame for the unigram matrix for which there are 2 variables, the words themselves ("word") and their frequencies ("count"):
+```{r}
+unigramDataFrame <- data.frame(word = names(unigramTermFreq), count = unigramTermFreq)
+```
+
+Order the words by most frequent to least frequent:
+```{r}
+unigramDataFrame <- unigramDataFrame[order(-unigramDataFrame$count), ]
+```
+
+### Exploring the top 25 most frequent words in the Unigram
+
+Subset the 25 most frequent words in the unigram:
+```{r}
+unigramDataFrameTop25 <- unigramDataFrame[1:25, ]
+```
+
+Generate a barplot for the top 25 frequencies:
+```{r}
+barplot(unigramDataFrameTop25$count, names.arg = unigramDataFrameTop25$word, las=2, cex.names = 0.82, ylab = "Frequency", main = "Frequency of Single Words")
+```
+
+
+### Building a Bigram Model
+
+Tokenize a Bigram:
+```{r}
+bigram <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+```
+
+Create a Term Document Matrix:
+```{r}
+bigramMatrix <- TermDocumentMatrix(corpus, control = list(tokenize = bigram))
+```
+
+To reduce the size of the data, find all word pairs in the Bigram Matrix with a frequency of at least 100:
+```{r}
+bigramFreqTerms <- findFreqTerms(bigramMatrix, lowfreq = 100)
+bigramMatrix <- bigramMatrix[bigramFreqTerms,]
+```
+
+Convert the bigram matrix variable to an actual matrix and determine the frequency of each of the word pairs in the matrix by adding the rows of the matrix (each row represents a word pair):
+```{r}
+bigramMatrix <- as.matrix(bigramMatrix)
+bigramTermFreq <- rowSums(bigramMatrix)
+```
+
+Create a data frame for the bigram matrix for which there are 2 variables, the word pairs themselves ("words") and their frequencies ("count"):
+```{r}
+bigramDataFrame <- data.frame(words = names(bigramTermFreq), count = bigramTermFreq)
+```
+
+Order the word pairs by most frequent to least frequent:
+```{r}
+bigramDataFrame <- bigramDataFrame[order(-bigramDataFrame$count), ]
+```
+
+### Exploring the top 25 most frequent word pairs in the Bigram
+
+Subset the 25 most frequent word pairs in the bigram:
+```{r}
+bigramDataFrameTop25 <- bigramDataFrame[1:25, ]
+```
+
+Generate a barplot for the top 25 frequencies
+```{r}
+barplot(bigramDataFrameTop25$count, names.arg = bigramDataFrameTop25$words, las=2, cex.names = 0.82, ylab = "Frequency", main = "Frequency of Word Pairs")
+```
+
+
+### Building a Trigram Model
+
+Tokenize a Trigram:
+```{r}
+trigram <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+```
+
+Create a Term Document Matrix:
+```{r}
+trigramMatrix <- TermDocumentMatrix(corpus, control = list(tokenize = trigram))
+```
+
+To reduce the size of the data, find all word triplets in the Trigram Matrix with a frequency of at least 50:
+```{r}
+trigramFreqTerms <- findFreqTerms(trigramMatrix, lowfreq = 50)
+trigramMatrix <- trigramMatrix[trigramFreqTerms,]
+```
+
+Convert the trigram matrix variable to an actual matrix and determine the frequency of each of the word triplets in the matrix by adding the rows of the matrix (each row represents a word triplet):
+```{r}
+trigramMatrix <- as.matrix(trigramMatrix)
+trigramTermFreq <- rowSums(trigramMatrix)
+```
+
+Create a data frame for the trigram matrix for which there are 2 variables, the word triplets themselves ("words") and their frequencies ("count"):
+```{r}
+trigramDataFrame <- data.frame(words = names(trigramTermFreq), count = trigramTermFreq)
+```
+
+Order the word triplets by most frequent to least frequent:
+```{r}
+trigramDataFrame <- trigramDataFrame[order(-trigramDataFrame$count), ]
+```
+
+### Exploring the top 25 most frequent word triplets in the Trigram
+
+Subset the 25 most frequent word triplets in the trigram:
+```{r}
+trigramDataFrameTop25 <- trigramDataFrame[1:25, ]
+```
+
+Generate a barplot for the top 25 frequencies
+```{r}
+barplot(trigramDataFrameTop25$count, names.arg = trigramDataFrameTop25$words, las=2, cex.names = 0.82, ylab = "Frequency", main = "Frequency of Word Triplets")
+```
+
+
+## Interesting Findings and Plans for Developing a Prediction Algorithm
+
+There are lots of definitie articles (example: "the"), indefinite articles (examples: "a", "an"), and prepositions (examples: "of","for","with") that appear. It may be ideal to remove these words from our corpus of text to get more specific words; however, these words are a necessary part of forming sentences so it also ideal to include them as well.
+
+Another idea is to build more n-gram models. We can look at 4-grams for pairs of 4 words, 5-grams for paris of 5 words, and 6-grams for pairs of 6 words. If necessary and convenient, we can build more n-gram models as well.
+
+In terms of building the prediction algorithm, it would be ideal to build more n-gram models as that would improve the accuracy of predicting the next words. The main caveat will be the size of the models as we will want a shiny application that does not have a sizable delay when predicting the next word and more importantly, a shiny application that can handle a lot of data and memory.
+
+The basic input for the Shiny Application will be for the user to enter a string of text, and the basic output for the Shiny Application will be the next word that is predicted. The plan is for the prediction algorithm to run in the background of the Shiny App on the server file.

@@ -1,0 +1,238 @@
+---
+title: "Mile Stone Report"
+author: "Ryan Pines"
+date: "April 3, 2017"
+output: html_document
+---
+
+## Introduction and Purpose
+
+The purpose of this MileStone Report
+
+## Loading the Libraries
+```{r, warning = FALSE, message = FALSE}
+library(tm)
+library(RWeka)
+```
+
+## Gathering the Data
+Create a new directory if necessary
+```{r, eval = FALSE}
+if(!file.exists("NLP_data")){
+	dir.create("NLP_data")
+}
+```
+
+Download the Capstone Dataset
+```{r, eval = FALSE}
+fileURL <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+download.file(fileURL, destfile = "./NLP_data/NLP_Dataset.zip", mode = "wb")
+```
+
+Unzip the File
+```{r, eval = FALSE}
+unzip(zipfile = "./NLP_data/NLP_Dataset.zip", exdir = "./NLP_data")
+```
+
+Navigate through the Capstone dataset. Notice there are 4 folders for 4 different languages: German, English, Finnish, Russian. Navigate to the folder that contains the data in the English language.
+```{r}
+setwd("C:\\Users\\574996\\Desktop\\R_Assignments\\NLP_data\\final\\en_US")
+```
+
+Read in the "Blogs" file and analyze the length of the file
+```{r}
+conBlog <- file("en_US.blogs.txt", "rb")
+Blogs <- readLines(conBlog)
+close(conBlog)
+length(Blogs)
+```
+
+Read in the "News" file and analyze the length of the file
+```{r}
+conNew <- file("en_US.news.txt", "rb")
+News <- readLines(conNew)
+close(conNew)
+length(News)
+```
+
+Read in the "Twitter" file and analyze the length of the file
+```{r, warning = FALSE, message = FALSE}
+conTwitter <- file("en_US.twitter.txt", "rb")
+Twitter <- readLines(conTwitter)
+close(conTwitter)
+length(Twitter)
+```
+
+**Given the size of all of the files, we will take a 1% sample from each file**
+
+First, set the seed for reproducibility
+```{r}
+set.seed(1223334444)
+```
+
+Sample the files
+```{r}
+blogsSample <- sample(Blogs, round(length(Blogs)*0.01,digits = 0))
+newsSample <- sample(News, round(length(News)*0.01,digits = 0))
+twitterSample <- sample(Twitter, round(length(Twitter)*0.01,digits = 0))
+```
+
+Combine the files together into one single text file
+```{r}
+textFileSample <- paste(blogsSample,newsSample,twitterSample)
+```
+
+
+## Cleaning the Data
+
+From the newly created single text file: 
+Convert all uppercase letters to lowercase letters, remove punctuation, remove numbers, and strip the whitespace
+```{r}
+textFileSample <- tolower(textFileSample)
+textFileSample <- removeNumbers(textFileSample)
+textFileSample <- removePunctuation(textFileSample)
+textFileSample <- stripWhitespace(textFileSample)
+```
+
+Next, we will need to remove all sources of profanity from our corpus
+
+First, we will gather a list of profanity 
+A list of profanity words can be gathered from the following website: http://www.cs.cmu.edu/~biglou/resources/bad-words.txt
+```{r}
+conProfanity <- url("http://www.cs.cmu.edu/~biglou/resources/bad-words.txt", "r")
+Profanity <- readLines(conProfanity)
+close(conProfanity)
+```
+
+Now, remove all of the text that contain profanity
+```{r}
+textFileSample <- textFileSample[!textFileSample %in% Profanity]
+```
+
+## Exploratory Data Analysis
+
+### Exploring Unigrams
+
+Create a "Unigram" variable
+```{r}
+unigram <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+```
+
+Determine the Frequency of words in the Unigram
+```{r}
+unigramFreq <- termFreq(textFileSample, control = list(tokenize = unigram))
+```
+
+Sort the frequency of words in the unigram in descending order
+```{r}
+unigramFreq <- sort(unigramFreq , decreasing = TRUE)
+```
+
+Subset the top 25 words that appear most frequently in the unigram
+```{r}
+unigramFreqTop25 <- unigramFreq[1:25]
+```
+
+Convert the subset into a data frame
+```{r}
+unigramFreqTop25 <- data.frame(unigramFreqTop25)
+```
+
+Change the column names
+```{r}
+colnames(unigramFreqTop25) <- c("word","count")
+```
+
+Print out the top 25 frequencies for the unigram
+```{r}
+print(unigramFreqTop25)
+```
+
+Generate a barplot for the top 25 frequencies
+```{r}
+barplot(unigramFreqTop25$count, names.arg = unigramFreqTop25$word, las=2, ylab = "Frequency", main = "Frequency of Single Words")
+```
+
+### Exploring Bigrams
+
+Create a "Bigram" variable
+```{r}
+bigram <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+```
+
+Determine the Frequency of word pairs in the Bigram
+```{r}
+bigramFreq <- termFreq(textFileSample, control = list(tokenize = bigram))
+```
+
+Sort the frequency of word pairs in the bigram in descending order
+```{r}
+bigramFreq <- sort(bigramFreq , decreasing = TRUE)
+```
+
+Subset the top 25 word pairs that appear most frequently in the bigram
+```{r}
+bigramFreqTop25 <- bigramFreq[1:25]
+```
+
+Convert the subset into a data frame
+```{r}
+bigramFreqTop25 <- data.frame(bigramFreqTop25)
+```
+
+Change the column names
+```{r}
+colnames(bigramFreqTop25) <- c("word","count")
+```
+
+Print out the top 25 frequencies for the bigram
+```{r}
+print(bigramFreqTop25)
+```
+
+Generate a barplot for the top 25 frequencies
+```{r}
+barplot(bigramFreqTop25$count, names.arg = bigramFreqTop25$word, las=2, ylab = "Frequency", main = "Frequency of Word Pairs")
+```
+
+### Exploring Trigrams
+
+Create a "Trigram" variable
+```{r}
+trigram <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+```
+
+Determine the Frequency of word triplets in the Trigram
+```{r}
+trigramFreq <- termFreq(textFileSample, control = list(tokenize = trigram))
+```
+
+Sort the frequency of word triplets in the trigram in descending order
+```{r}
+trigramFreq <- sort(trigramFreq , decreasing = TRUE)
+```
+
+Subset the top 25 word triplets that appear most frequently in the trigram
+```{r}
+trigramFreqTop25 <- trigramFreq[1:25]
+```
+
+Convert the subset into a data frame
+```{r}
+trigramFreqTop25 <- data.frame(trigramFreqTop25)
+```
+
+Change the column names
+```{r}
+colnames(trigramFreqTop25) <- c("word","count")
+```
+
+Print out the top 25 frequencies for the trigram
+```{r}
+print(trigramFreqTop25)
+```
+
+Generate a barplot for the top 25 frequencies
+```{r}
+barplot(trigramFreqTop25$count, names.arg = trigramFreqTop25$word, las=2, ylab = "Frequency", main = "Frequency of Word Triplets")
+```

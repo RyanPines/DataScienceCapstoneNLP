@@ -1,0 +1,10 @@
+name: predict
+title: predict
+account: ryanpines
+server: shinyapps.io
+appId: 177398
+bundleId: 812815
+url: https://ryanpines.shinyapps.io/predict/
+when: 1493778168.47013
+asMultiple: FALSE
+asStatic: FALSE
